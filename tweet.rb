@@ -6,14 +6,20 @@ require 'openssl'
 require 'net/https'
 require 'cgi'
 
-
 # init https connection
-https = Net::HTTP.new('api.twitter.com', 443)
+unless ENV['http_proxy'].nil? then
+  proxy_host, proxy_port = (ENV['http_proxy'] || '').gsub(/http:\/\//, '').split(':') 
+  proxy_port = proxy_port.gsub(/\//, '').to_i 
+end
+
+proxy_class = Net::HTTP::Proxy(proxy_host, proxy_port)
+
+# https = Net::HTTP.new('api.twitter.com', 443)
+https = proxy_class.new('api.twitter.com', 443)
 https.use_ssl = true
 https.verify_mode = OpenSSL::SSL::VERIFY_PEER
 https.ca_file = 'twitter.crt'
 https.verify_depth = 5
-
 
 # init OAuth
 consumer_key = "bPWKEcFYwxtcJflbq2Naw"
@@ -25,11 +31,11 @@ token = ["", "", ""]
 
 if !File.exist?(ENV["HOME"] + '/.tweet')
 	# get Request Token
-	param_string = "oauth_callback=oob&oauth_consumer_key=#{consumer_key}&oauth_nonce=#{nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=#{timestamp}&oauth_version=1.0"
+	param_string = "oauth_callback=oob&oauth_consumer_key=#{consumer_key}&oauth_nonce=#{nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=#{timestamp}&oauth_version=1.1"
 	signature_base = "POST&" + CGI.escape('https://api.twitter.com/oauth/request_token') + "&" + CGI.escape(param_string)
 	signing_key = consumer_secret + "&"
 	signature = Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::SHA1.new, signing_key, signature_base)).chomp!
-	oauth_header = "OAuth oauth_callback=\"oob\", oauth_consumer_key=\"#{consumer_key}\", oauth_nonce=\"#{nonce}\", oauth_signature=\"#{CGI.escape(signature)}\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"#{timestamp}\", oauth_version=\"1.0\""
+	oauth_header = "OAuth oauth_callback=\"oob\", oauth_consumer_key=\"#{consumer_key}\", oauth_nonce=\"#{nonce}\", oauth_signature=\"#{CGI.escape(signature)}\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"#{timestamp}\", oauth_version=\"1.1\""
 
 	https.start {
 		response = https.post('/oauth/request_token', nil, {'Authorization' => oauth_header})
@@ -44,11 +50,11 @@ if !File.exist?(ENV["HOME"] + '/.tweet')
 
 
 	# get OAuth Token
-	param_string = "oauth_consumer_key=#{consumer_key}&oauth_nonce=#{nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=#{timestamp}&oauth_token=#{token[1]}&oauth_version=1.0"
+	param_string = "oauth_consumer_key=#{consumer_key}&oauth_nonce=#{nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=#{timestamp}&oauth_token=#{token[1]}&oauth_version=1.1"
 	signature_base = "POST&" + CGI.escape('https://api.twitter.com/oauth/access_token') + "&" + CGI.escape(param_string)
 	signing_key = consumer_secret + "&" + token[2]
 	signature = Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::SHA1.new, signing_key, signature_base)).chomp!
-	oauth_header = "OAuth oauth_consumer_key=\"#{consumer_key}\", oauth_nonce=\"#{nonce}\", oauth_signature=\"#{CGI.escape(signature)}\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"#{timestamp}\", oauth_token=\"#{token[1]}\", oauth_version=\"1.0\""
+	oauth_header = "OAuth oauth_consumer_key=\"#{consumer_key}\", oauth_nonce=\"#{nonce}\", oauth_signature=\"#{CGI.escape(signature)}\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"#{timestamp}\", oauth_token=\"#{token[1]}\", oauth_version=\"1.1\""
 
 	https.start {
 		response = https.post('/oauth/access_token', "oauth_verifier=#{pin}", {'Authorization' => oauth_header})
@@ -80,11 +86,11 @@ if status.size >= 140
 end
 
 # send to Twitter
-param_string = "oauth_consumer_key=#{consumer_key}&oauth_nonce=#{nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=#{timestamp}&oauth_token=#{token[1]}&oauth_version=1.0&status=#{CGI.escape(status).gsub("+", "%20")}"
+param_string = "oauth_consumer_key=#{consumer_key}&oauth_nonce=#{nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=#{timestamp}&oauth_token=#{token[1]}&oauth_version=1.1&status=#{CGI.escape(status).gsub("+", "%20")}"
 signature_base = "POST&" + CGI.escape('https://api.twitter.com/1/statuses/update.json') + "&" + CGI.escape(param_string)
 signing_key = consumer_secret + "&" + token[2]
 signature = Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::SHA1.new, signing_key, signature_base)).chomp!
-oauth_header = "OAuth oauth_consumer_key=\"#{consumer_key}\", oauth_nonce=\"#{nonce}\", oauth_signature=\"#{CGI.escape(signature)}\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"#{timestamp}\", oauth_token=\"#{token[1]}\", oauth_version=\"1.0\""
+oauth_header = "OAuth oauth_consumer_key=\"#{consumer_key}\", oauth_nonce=\"#{nonce}\", oauth_signature=\"#{CGI.escape(signature)}\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"#{timestamp}\", oauth_token=\"#{token[1]}\", oauth_version=\"1.1\""
 
 https.start {
 	response = https.post('/1/statuses/update.json', "status=#{CGI.escape(status).gsub("+", "%20")}", {'Authorization' => oauth_header})
